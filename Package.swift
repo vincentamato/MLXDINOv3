@@ -10,7 +10,7 @@ let package = Package(
     name: "MLXDINOv3",
     platforms: [
         .iOS(.v17),
-        .macOS(.v14)
+        .macOS(.v14),
     ],
     products: [
         .library(
@@ -20,7 +20,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.29.1"),
-        .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.1")
+        .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.1"),
     ],
     targets: [
         .target(
@@ -39,12 +39,12 @@ let package = Package(
             name: "MLXDINOv3Tests",
             dependencies: [
                 "MLXDINOv3",
-                .product(name: "Hub", package: "swift-transformers")
+                .product(name: "Hub", package: "swift-transformers"),
             ],
             path: "Tests/MLXDINOv3Tests",
             resources: [
                 .process("Resources")
             ]
-        )
+        ),
     ]
 )

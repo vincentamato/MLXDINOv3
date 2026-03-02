@@ -6,11 +6,9 @@
 //
 
 import AppKit
-import Foundation
 import Hub
 import MLX
 @testable import MLXDINOv3
-import MLXNN
 import Testing
 
 actor TestResourceManager {
@@ -46,8 +44,9 @@ actor TestResourceManager {
             throw TestError.modelNotFound("""
             Could not find test bundle resource directory.
 
-            To run tests, convert the model and place it in Tests/MLXDINOv3Tests/Resources/Model/:
-              swift run Convert facebook/dinov3-vits16-pretrain-lvd1689m Tests/MLXDINOv3Tests/Resources/Model
+            To run tests, first build and run the Convert target:
+              xcodebuild build -scheme Convert -destination platform=macOS -derivedDataPath .build/xcode
+              .build/xcode/Build/Products/Release/Convert facebook/dinov3-vits16-pretrain-lvd1689m Tests/MLXDINOv3Tests/Resources/Model
 
             The directory should contain:
               - config.json
@@ -64,8 +63,9 @@ actor TestResourceManager {
             throw TestError.modelNotFound("""
             Model files not found in test bundle.
 
-            To run tests, convert the model and place it in Tests/MLXDINOv3Tests/Resources/Model/:
-              swift run Convert facebook/dinov3-vits16-pretrain-lvd1689m Tests/MLXDINOv3Tests/Resources/Model
+            To run tests, first build and run the Convert target:
+              xcodebuild build -scheme Convert -destination platform=macOS -derivedDataPath .build/xcode
+              .build/xcode/Build/Products/Release/Convert facebook/dinov3-vits16-pretrain-lvd1689m Tests/MLXDINOv3Tests/Resources/Model
 
             The directory should contain:
               - config.json
@@ -102,13 +102,12 @@ struct MLXDINOv3Tests {
         try await TestResourceManager.shared.getResources()
     }
 
-    func loadTestInputs(modelPath: URL, outputsPath _: URL) throws -> (image: NSImage, model: DinoVisionTransformer, inputs: MLXArray) {
+    func loadTestInputs(modelPath: URL) throws -> (model: DinoVisionTransformer, inputs: MLXArray) {
         guard let imageURL = Bundle.module.url(forResource: "Image", withExtension: "jpg") else {
             throw TestError.imageLoadFailed
         }
 
         guard let image = NSImage(contentsOf: imageURL) else {
-            print("Failed to load image from \(imageURL.path).")
             throw TestError.imageLoadFailed
         }
 
@@ -117,7 +116,7 @@ struct MLXDINOv3Tests {
         let processor = ImageProcessor(size: 224)
         let inputs = try processor(image)
 
-        return (image, model, inputs)
+        return (model, inputs)
     }
 
     func loadPyTorchOutput(filename: String, outputsPath: URL) throws -> [String: MLXArray] {
@@ -126,29 +125,6 @@ struct MLXDINOv3Tests {
             throw TestError.missingTensor("Could not find \(filename) at \(url.path).")
         }
         return try MLX.loadArrays(url: url)
-    }
-
-    func arraysAreClose(_ a: MLXArray, _ b: MLXArray, rtol: Float, atol: Float) -> Bool {
-        guard a.shape == b.shape else {
-            print("Shape mismatch: \(a.shape) vs \(b.shape)")
-            return false
-        }
-
-        let aCast = a.asType(.float32)
-        let bCast = b.asType(.float32)
-
-        let diff = abs(aCast - bCast)
-        let threshold = MLXArray(atol) + MLXArray(rtol) * abs(bCast)
-        let withinTolerance = MLX.lessEqual(diff, threshold)
-        let allClose = withinTolerance.all()
-
-        if !allClose.item(Bool.self) {
-            let maxDiff = diff.max().item(Float.self)
-            let meanDiff = mean(diff).item(Float.self)
-            print("Max difference: \(maxDiff)")
-            print("Mean difference: \(meanDiff)")
-        }
-        return allClose.item(Bool.self)
     }
 
     func arraysSimilar(_ a: MLXArray, _ b: MLXArray, minCosineSim: Float = 0.999, maxRelL2: Float = 0.02) -> Bool {
@@ -183,7 +159,7 @@ struct MLXDINOv3Tests {
     @Test("Pooler Output matches PyTorch")
     func testPoolerOutput() async throws {
         let (modelPath, outputsPath) = try await ensureTestResources()
-        let (_, model, inputs) = try loadTestInputs(modelPath: modelPath, outputsPath: outputsPath)
+        let (model, inputs) = try loadTestInputs(modelPath: modelPath)
         let outputs = model(inputs, outputHiddenStates: false, outputAttentions: false)
 
         let ptOutputs = try loadPyTorchOutput(filename: "pooler_output.safetensors", outputsPath: outputsPath)
@@ -192,15 +168,14 @@ struct MLXDINOv3Tests {
         }
 
         #expect(outputs.poolerOutput.shape == ptPoolerOutput.shape)
-        let isClose = arraysAreClose(outputs.poolerOutput, ptPoolerOutput,
-                                     rtol: relativeTolerance, atol: absoluteTolerance)
-        #expect(isClose)
+        #expect(allClose(outputs.poolerOutput, ptPoolerOutput,
+                         rtol: Double(relativeTolerance), atol: Double(absoluteTolerance)).item(Bool.self))
     }
 
     @Test("Last Hidden State matches PyTorch")
     func testLastHiddenState() async throws {
         let (modelPath, outputsPath) = try await ensureTestResources()
-        let (_, model, inputs) = try loadTestInputs(modelPath: modelPath, outputsPath: outputsPath)
+        let (model, inputs) = try loadTestInputs(modelPath: modelPath)
         let outputs = model(inputs, outputHiddenStates: false, outputAttentions: false)
 
         let ptOutputs = try loadPyTorchOutput(filename: "last_hidden_state.safetensors", outputsPath: outputsPath)
@@ -209,15 +184,14 @@ struct MLXDINOv3Tests {
         }
 
         #expect(outputs.lastHiddenState.shape == ptLastHidden.shape)
-        let isClose = arraysAreClose(outputs.lastHiddenState, ptLastHidden,
-                                     rtol: relativeTolerance, atol: absoluteTolerance)
-        #expect(isClose)
+        #expect(allClose(outputs.lastHiddenState, ptLastHidden,
+                         rtol: Double(relativeTolerance), atol: Double(absoluteTolerance)).item(Bool.self))
     }
 
     @Test("Intermediate Hidden State (Layer 6) matches PyTorch")
     func hiddenState6() async throws {
         let (modelPath, outputsPath) = try await ensureTestResources()
-        let (_, model, inputs) = try loadTestInputs(modelPath: modelPath, outputsPath: outputsPath)
+        let (model, inputs) = try loadTestInputs(modelPath: modelPath)
         let outputs = model(inputs, outputHiddenStates: true, outputAttentions: false)
 
         let ptOutputs = try loadPyTorchOutput(filename: "hidden_state_6.safetensors", outputsPath: outputsPath)
@@ -240,7 +214,7 @@ struct MLXDINOv3Tests {
     @Test("Attention Weights (Layer 6) match PyTorch")
     func attention6() async throws {
         let (modelPath, outputsPath) = try await ensureTestResources()
-        let (_, model, inputs) = try loadTestInputs(modelPath: modelPath, outputsPath: outputsPath)
+        let (model, inputs) = try loadTestInputs(modelPath: modelPath)
         let outputs = model(inputs, outputHiddenStates: false, outputAttentions: true)
 
         let ptOutputs = try loadPyTorchOutput(filename: "attention_6.safetensors", outputsPath: outputsPath)
@@ -261,8 +235,8 @@ struct MLXDINOv3Tests {
 
     @Test("Output shapes are correct")
     func outputShapes() async throws {
-        let (modelPath, outputsPath) = try await ensureTestResources()
-        let (_, model, inputs) = try loadTestInputs(modelPath: modelPath, outputsPath: outputsPath)
+        let (modelPath, _) = try await ensureTestResources()
+        let (model, inputs) = try loadTestInputs(modelPath: modelPath)
         let outputs = model(inputs, outputHiddenStates: true, outputAttentions: true)
 
         let B = 1, D = 384, N = 201, H = 6, numLayers = 12
@@ -286,6 +260,5 @@ enum TestError: Error {
     case imageLoadFailed
     case missingTensor(String)
     case missingOutput(String)
-    case invalidOutput(String)
     case modelNotFound(String)
 }

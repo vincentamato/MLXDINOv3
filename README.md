@@ -1,12 +1,12 @@
 # MLXDINOv3
 
-A native Swift implementation of Meta’s [DINOv3](https://arxiv.org/abs/2508.10104) using [MLX Swift](https://github.com/ml-explore/mlx-swift).
+Swift port of Meta's [DINOv3](https://arxiv.org/abs/2508.10104) on [MLX Swift](https://github.com/ml-explore/mlx-swift).
 
-DINOv3 is a family of self-supervised vision foundation models from [Meta AI](https://ai.meta.com/), producing high-quality dense visual features that outperform specialized models without fine-tuning. This package provides a numerically validated, on-device compatible version for Apple silicon.
+DINOv3 is a self-supervised vision model from Meta that produces dense visual features useful for classification, segmentation, retrieval, etc. without fine-tuning. This package implements the architecture in MLX and validates outputs against a PyTorch reference.
 
 ## Installation
 
-Add MLXDINOv3 to your Swift Package Manager dependencies:
+Add to your `Package.swift`:
 
 ```swift
 dependencies: [
@@ -14,42 +14,34 @@ dependencies: [
 ]
 ```
 
-Then import it:
-
 ```swift
 import MLXDINOv3
 ```
 
-## Converting Hugging Face weights to MLX format
+## Converting weights
 
-Convert Hugging Face weights to MLX format using the conversion CLI in Xcode:
+The `Convert` target downloads a Hugging Face checkpoint and converts it to MLX format. Only ViT models are supported for now.
 
-1. Open the package in Xcode: `xed .`
-2. Select the `Convert` scheme from the scheme selector
-3. Edit the scheme (Product → Scheme → Edit Scheme)
-4. Under "Run" → "Arguments", add:
-   - `facebook/dinov3-vits16-pretrain-lvd1689m`
-   - `./Models/dinov3-vits16-mlx`
-5. Run the scheme (Cmd+R)
+```bash
+xcodebuild build -scheme Convert -destination platform=macOS -derivedDataPath .build/xcode && \
+  .build/xcode/Build/Products/Release/Convert \
+    facebook/dinov3-vits16-pretrain-lvd1689m \
+    ./Models/dinov3-vits16-mlx
+```
 
-> **Note**: Currently, only the ViT models are supported.
-
-## Example Usage
+## Usage
 
 ```swift
 import AppKit
 import MLX
 import MLXDINOv3
 
-// Load a pretrained model
 let model = try loadPretrained(modelPath: "Models/dinov3-vits16-mlx")
 
-// Preprocess an image
 let image = NSImage(contentsOfFile: "image.jpg")!
 let processor = ImageProcessor()
 let inputs = try processor(image)
 
-// Run inference
 let outputs = model(inputs)
 
 print("Pooler output shape:", outputs.poolerOutput.shape)
@@ -58,31 +50,28 @@ print("Last hidden state shape:", outputs.lastHiddenState.shape)
 
 ## Testing
 
-All testing must be done from Xcode due to MLX metallib requirements.
+Tests use `xcodebuild` because MLX depends on the Metal backend (`swift test` won't work). Before running tests, you need to convert the model into the test resources directory.
 
-**Step 1: Convert the test model**
+```bash
+# Convert the test model (skip if already done)
+xcodebuild build -scheme Convert -destination platform=macOS -derivedDataPath .build/xcode && \
+  .build/xcode/Build/Products/Release/Convert \
+    facebook/dinov3-vits16-pretrain-lvd1689m \
+    Tests/MLXDINOv3Tests/Resources/Model
 
-1. Open the package in Xcode: `xed .`
-2. Select the `Convert` scheme
-3. Edit the scheme (Product → Scheme → Edit Scheme)
-4. Under "Run" → "Arguments", add:
-   - `facebook/dinov3-vits16-pretrain-lvd1689m`
-   - `Tests/MLXDINOv3Tests/Resources/Model`
-5. Run (Cmd+R)
+# Run tests
+xcodebuild test -scheme MLXDINOv3Tests -destination platform=macOS
+```
 
-**Step 2: Run tests**
-
-Run tests with **Cmd+U** or **Product → Test**
-
-Tests automatically download PyTorch reference outputs from HuggingFace Hub for validation.
+Tests download PyTorch reference outputs from Hugging Face and compare against them.
 
 ## References
 
-- DINOv3 Paper: [DINOv3](https://arxiv.org/abs/2508.10104)
-- DINOv3 Repository: [facebookresearch/dinov3](https://github.com/facebookresearch/dinov3)
+- [DINOv3 paper](https://arxiv.org/abs/2508.10104)
+- [facebookresearch/dinov3](https://github.com/facebookresearch/dinov3)
 
 ## License
 
-This package is released under the [MIT License](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
-Note: The pretrained DINOv3 weights and original model architecture are released under Meta’s [DINOv3 License](https://ai.meta.com/resources/models-and-libraries/dinov3-license/).
+Pretrained weights are under Meta's [DINOv3 License](https://ai.meta.com/resources/models-and-libraries/dinov3-license/).
