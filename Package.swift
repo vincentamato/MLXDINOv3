@@ -16,7 +16,7 @@ let package = Package(
         .library(
             name: "MLXDINOv3",
             targets: ["MLXDINOv3"]
-        )
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/ml-explore/mlx-swift.git", from: "0.29.1"),
@@ -31,7 +31,7 @@ let package = Package(
         .executableTarget(
             name: "Convert",
             dependencies: mlxDeps + [
-                .product(name: "Transformers", package: "swift-transformers")
+                .product(name: "Transformers", package: "swift-transformers"),
             ],
             path: "Sources/Convert"
         ),
@@ -43,7 +43,7 @@ let package = Package(
             ],
             path: "Tests/MLXDINOv3Tests",
             resources: [
-                .process("Resources")
+                .process("Resources"),
             ]
         ),
     ]
