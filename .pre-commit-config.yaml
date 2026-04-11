@@ -1,36 +1,9 @@
 repos:
   - repo: local
     hooks:
-      - id: swiftformat
-        name: SwiftFormat
-        entry: swiftformat
+      - id: swift-format
+        name: swift-format
         language: system
+        entry: swift-format format --in-place --configuration .swift-format --recursive .
+        require_serial: true
         types: [swift]
-        args:
-          - "--indent"
-          - "4"
-          - "--wraparguments"
-          - "after-first"
-          - "--swiftversion"
-          - "6.0"
-          - "--exclude"
-          - "Package.swift"
-          - "."
-
-      - id: swiftlint
-        name: SwiftLint
-        entry: bash
-        language: system
-        types: [swift]
-        args:
-          - "-c"
-          - |
-            #!/bin/bash
-            swiftlint lint \
-              --quiet \
-              --disable-all-rules \
-              --enable redundant_type_annotation,unused_closure_parameter \
-              --enable line_length,function_parameter_count,type_name,opening_brace,shorthand_operator,trailing_comma,identifier_name,large_tuple \
-              --path Sources \
-              --path Tests || true
-
