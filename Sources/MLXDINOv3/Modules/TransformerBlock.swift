@@ -20,7 +20,8 @@ final class TransformerBlock: Module {
         ffnBias: Bool,
         initValues: Float,
         layerNormEps: Float,
-        useGatedMlp: Bool
+        useGatedMlp: Bool,
+        activation: Activation? = nil
     ) {
         _norm1.wrappedValue = LayerNorm(dimensions: dim, eps: layerNormEps)
 
@@ -36,10 +37,15 @@ final class TransformerBlock: Module {
 
         _norm2.wrappedValue = LayerNorm(dimensions: dim, eps: layerNormEps)
 
+        // Without an explicit activation, use the pairing of the released checkpoints.
         _mlp.wrappedValue =
             useGatedMlp
-            ? SwiGLUFFN(inFeatures: dim, hiddenFeatures: intermediateSize, bias: ffnBias)
-            : MLP(inFeatures: dim, hiddenFeatures: intermediateSize, bias: ffnBias)
+            ? SwiGLUFFN(
+                inFeatures: dim, hiddenFeatures: intermediateSize, bias: ffnBias,
+                activation: activation ?? .silu)
+            : MLP(
+                inFeatures: dim, hiddenFeatures: intermediateSize, bias: ffnBias,
+                activation: activation ?? .gelu)
 
         _layerScale2.wrappedValue = LayerScale(dim: dim, initValues: initValues)
     }

@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+
+      # The suite that needs Meta's gated checkpoint skips itself; everything else runs offline
+      # from the fixtures in Tests/MLXDINOv3Tests/Fixtures.
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -scheme MLXDINOv3-Package \
+            -destination 'platform=macOS' \
+            -derivedDataPath .build/xcode

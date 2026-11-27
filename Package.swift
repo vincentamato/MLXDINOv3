@@ -39,11 +39,13 @@ let package = Package(
             name: "MLXDINOv3Tests",
             dependencies: [
                 "MLXDINOv3",
+                "Convert",
                 .product(name: "Hub", package: "swift-transformers"),
             ],
             path: "Tests/MLXDINOv3Tests",
             resources: [
-                .process("Resources")
+                .process("Resources"),
+                .copy("Fixtures"),
             ]
         ),
     ]
