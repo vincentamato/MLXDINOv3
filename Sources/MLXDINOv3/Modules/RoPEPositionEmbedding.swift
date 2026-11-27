@@ -1,24 +1,29 @@
 import MLX
-import MLXNN
 
-final class RoPEPositionEmbedding: Module {
-    let invFreq: MLXArray
+/// Rotary position embedding for the patch tokens.
+///
+/// This is deliberately not a `Module`. The frequencies are fixed, so they must stay out of
+/// `parameters()`: otherwise an optimizer would train them and they would be written into saved
+/// checkpoints under a key no other DINOv3 implementation knows.
+struct RoPEPositionEmbedding {
+    private let invFreq: MLXArray
 
     init(
         embedDim: Int,
         numHeads: Int,
         base: Float = 100.0
     ) {
-        precondition(embedDim % (4 * numHeads) == 0)
+        precondition(
+            numHeads > 0 && embedDim % (4 * numHeads) == 0,
+            "embedDim (\(embedDim)) must be a multiple of 4 * numHeads (\(numHeads))")
 
         let headDim = embedDim / numHeads
         let Dq = headDim / 4
         let exponents = MLXArray(0 ..< Dq).asType(.float32) * (4.0 / Float(headDim))
         invFreq = 1.0 / pow(MLXArray(base), exponents)
-
-        super.init()
     }
 
+    /// Returns `(cos, sin)`, each of shape `[H * W, headDim]`.
     func callAsFunction(H: Int, W: Int, dtype: DType = .float32) -> (MLXArray, MLXArray) {
         let coordsH = MLXArray(stride(from: 0.5, to: Float(H), by: 1.0)) / Float(H)
         let coordsW = MLXArray(stride(from: 0.5, to: Float(W), by: 1.0)) / Float(W)
